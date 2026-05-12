@@ -2,6 +2,8 @@ using System;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Windows;
+using System.Windows.Input;
+using System.Windows.Media;
 using MAB_Spark.Models;
 using MAB_Spark.Services;
 
@@ -12,6 +14,7 @@ namespace MAB_Spark
         private DatabaseService _dbService;
         private AutoStartService _autoStartService;
         private ObservableCollection<Shortcut> _shortcuts;
+        private bool _isDarkTheme = true;
 
         public SettingsWindow(DatabaseService dbService)
         {
@@ -20,8 +23,52 @@ namespace MAB_Spark
             _autoStartService = new AutoStartService();
             _shortcuts = new ObservableCollection<Shortcut>();
 
+            DetectSystemTheme();
             LoadShortcuts();
             UpdateUI();
+        }
+
+        private void DetectSystemTheme()
+        {
+            try
+            {
+                var registry = Microsoft.Win32.Registry.CurrentUser;
+                var key = registry.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize");
+                var value = key?.GetValue("AppsUseLightTheme");
+                _isDarkTheme = value == null || (int)value == 0;
+            }
+            catch
+            {
+                _isDarkTheme = true;
+            }
+
+            ApplyTheme();
+        }
+
+        private void ApplyTheme()
+        {
+            if (_isDarkTheme)
+            {
+                // Dark Theme
+                this.Resources["BackgroundColor"] = Color.FromArgb(204, 15, 15, 30);
+                this.Resources["PrimaryAccent"] = Color.FromArgb(255, 99, 102, 241);
+                this.Resources["SecondaryAccent"] = Color.FromArgb(255, 236, 72, 153);
+                this.Resources["TertiaryAccent"] = Color.FromArgb(255, 6, 182, 212);
+                this.Resources["TextColor"] = Colors.White;
+                this.Resources["TextMuted"] = Color.FromArgb(255, 156, 163, 175);
+                ThemeToggleButton.Content = "☀️";
+            }
+            else
+            {
+                // Light Theme
+                this.Resources["BackgroundColor"] = Color.FromArgb(242, 245, 245, 245);
+                this.Resources["PrimaryAccent"] = Color.FromArgb(255, 99, 102, 241);
+                this.Resources["SecondaryAccent"] = Color.FromArgb(255, 236, 72, 153);
+                this.Resources["TertiaryAccent"] = Color.FromArgb(255, 6, 182, 212);
+                this.Resources["TextColor"] = Color.FromArgb(255, 31, 41, 55);
+                this.Resources["TextMuted"] = Color.FromArgb(255, 107, 114, 128);
+                ThemeToggleButton.Content = "🌙";
+            }
         }
 
         private void LoadShortcuts()
@@ -32,19 +79,25 @@ namespace MAB_Spark
             {
                 _shortcuts.Add(shortcut);
             }
-            ShortcutsGrid.ItemsSource = _shortcuts;
+            // DataGrid binding'i sağla
+            if (ShortcutsGrid != null)
+            {
+                ShortcutsGrid.ItemsSource = null;
+                ShortcutsGrid.ItemsSource = _shortcuts;
+            }
         }
 
         private void UpdateUI()
         {
-            // Auto-start durumunu kontrol et
             AutoStartCheckBox.IsChecked = _autoStartService.IsAutoStartEnabled();
+            ShortcutsCountText.Text = $"Total Shortcuts: {_shortcuts.Count}";
+            DatabasePathText.Text = $"Database: {_dbService.GetDatabasePath()}";
+        }
 
-            // Kısaltma sayısını göster
-            ShortcutsCountText.Text = $"Toplam kısaltma: {_shortcuts.Count}";
-
-            // Veritabanı yolunu göster
-            DatabasePathText.Text = $"Veritabanı: {_dbService.GetDatabasePath()}";
+        private void ThemeToggle_Click(object sender, RoutedEventArgs e)
+        {
+            _isDarkTheme = !_isDarkTheme;
+            ApplyTheme();
         }
 
         private void AddButton_Click(object sender, RoutedEventArgs e)
@@ -54,14 +107,15 @@ namespace MAB_Spark
 
             if (string.IsNullOrEmpty(shortText) || string.IsNullOrEmpty(expandedText))
             {
-                MessageBox.Show("Lütfen hem kısaltma hem de gerçek metni girin.", "Uyarı", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show("Please enter both shortcut and expanded text.", "Warning", 
+                               MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
-            // Çift olup olmadığını kontrol et
             if (_shortcuts.Any(s => s.ShortText == shortText))
             {
-                MessageBox.Show("Bu kısaltma zaten mevcut.", "Hata", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show("This shortcut already exists.", "Error", 
+                               MessageBoxButton.OK, MessageBoxImage.Error);
                 return;
             }
 
@@ -81,12 +135,11 @@ namespace MAB_Spark
                 ExpandedTextBox.Clear();
                 ShortTextBox.Focus();
 
-                ShortcutsCountText.Text = $"Toplam kısaltma: {_shortcuts.Count}";
-                MessageBox.Show($"'{shortText}' → '{expandedText}' başarıyla eklendi.", "Başarılı", MessageBoxButton.OK, MessageBoxImage.Information);
+                ShortcutsCountText.Text = $"Total Shortcuts: {_shortcuts.Count}";
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Hata: {ex.Message}", "Hata", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show($"Error: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -94,7 +147,8 @@ namespace MAB_Spark
         {
             if (ShortcutsGrid.SelectedItem is Shortcut selected)
             {
-                var result = MessageBox.Show($"'{selected.ShortText}' silinsin mi?", "Onay", MessageBoxButton.YesNo, MessageBoxImage.Question);
+                var result = MessageBox.Show($"Delete '{selected.ShortText}'?", "Confirm", 
+                                            MessageBoxButton.YesNo, MessageBoxImage.Question);
 
                 if (result == MessageBoxResult.Yes)
                 {
@@ -102,17 +156,14 @@ namespace MAB_Spark
                     {
                         _dbService.DeleteShortcut(selected.Id);
                         _shortcuts.Remove(selected);
-                        ShortcutsCountText.Text = $"Toplam kısaltma: {_shortcuts.Count}";
+                        ShortcutsCountText.Text = $"Total Shortcuts: {_shortcuts.Count}";
                     }
                     catch (Exception ex)
                     {
-                        MessageBox.Show($"Silme hatası: {ex.Message}", "Hata", MessageBoxButton.OK, MessageBoxImage.Error);
+                        MessageBox.Show($"Delete error: {ex.Message}", "Error", 
+                                       MessageBoxButton.OK, MessageBoxImage.Error);
                     }
                 }
-            }
-            else
-            {
-                MessageBox.Show("Lütfen silmek için bir kısaltma seçin.", "Uyarı", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
 
@@ -126,9 +177,24 @@ namespace MAB_Spark
             _autoStartService.DisableAutoStart();
         }
 
-        private void MinimizeButton_Click(object sender, RoutedEventArgs e)
+        private void Close_Click(object sender, RoutedEventArgs e)
         {
             this.Hide();
+        }
+
+        private void Window_PreviewMouseDown(object sender, MouseButtonEventArgs e)
+        {
+            if (e.LeftButton == MouseButtonState.Pressed)
+            {
+                try
+                {
+                    this.DragMove();
+                }
+                catch
+                {
+                    // Ignore drag error
+                }
+            }
         }
 
         public void RefreshShortcuts()
