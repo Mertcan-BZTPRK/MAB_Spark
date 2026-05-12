@@ -8,7 +8,6 @@
         Opacity="0">
     <Grid>
         <tb:TaskbarIcon x:Name="TrayIcon"
-                        IconSource="pack://application:,,,/Resources/icon.ico"
                         ToolTipText="MAB_Spark - Metin Genişletme">
             <tb:TaskbarIcon.ContextMenu>
                 <ContextMenu>
