@@ -65,17 +65,33 @@ namespace MAB_Spark.Services
 
         public void StartHooking(Action<string, string> onShortcutExpanded)
         {
-            _onShortcutExpanded = onShortcutExpanded;
-            _proc = HookCallback;
-
-            using (var curProcess = System.Diagnostics.Process.GetCurrentProcess())
-            using (var curModule = curProcess.MainModule)
+            try
             {
-                if (curModule != null)
+                _onShortcutExpanded = onShortcutExpanded;
+                _proc = HookCallback;
+
+                using (var curProcess = System.Diagnostics.Process.GetCurrentProcess())
+                using (var curModule = curProcess.MainModule)
                 {
-                    var moduleHandle = GetModuleHandle(curModule.ModuleName);
-                    _hookId = SetWindowsHookEx(WH_KEYBOARD_LL, _proc, moduleHandle, 0);
+                    if (curModule != null)
+                    {
+                        var moduleHandle = GetModuleHandle(curModule.ModuleName);
+                        if (moduleHandle != IntPtr.Zero)
+                        {
+                            _hookId = SetWindowsHookEx(WH_KEYBOARD_LL, _proc, moduleHandle, 0);
+                            Debug.WriteLine($"Hook set successfully: {_hookId}");
+                        }
+                        else
+                        {
+                            Debug.WriteLine("Failed to get module handle");
+                        }
+                    }
                 }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"StartHooking error: {ex.Message}");
+                System.Diagnostics.Trace.WriteLine($"StartHooking error: {ex.Message}");
             }
         }
 

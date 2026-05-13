@@ -11,7 +11,10 @@
         Background="Transparent"
         ShowInTaskbar="False"
         PreviewMouseDown="Window_PreviewMouseDown"
-        ResizeMode="CanResize">
+        ResizeMode="CanResize"
+        
+        Closing="Window_Closing"
+       >
 
     <Window.Resources>
         <!-- Colors -->
@@ -172,3 +175,4 @@
         </Grid>
     </Border>
 </Window>
+
